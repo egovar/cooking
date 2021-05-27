@@ -3,10 +3,10 @@ const md5 = require('md5');
 const randomstring = require('randomstring');
 const server = 'localhost';
 const pool = new Pool({
-    user: 'api3',
-    host: server,
-    database: 'CooKing',
-    password: 'CooKingPassWord1234',
+    user: 'ayyxvxcawvxmbm',
+    host: 'ec2-34-240-75-196.eu-west-1.compute.amazonaws.com',
+    database: 'd9qfgv471omc11',
+    password: 'f6a3a01dd90a0c2293043b70a22071617a3d7a1d13c9885ed094db2c9ba4deaa',
     port: 5432,
 });
 
