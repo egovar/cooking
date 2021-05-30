@@ -24,6 +24,27 @@ app.use(
 
 app.listen(process.env.PORT || port);
 
+app.use(function (req, res, next) {
+    let origins = [
+        'http://example.com',
+        'http://www.example.com'
+    ];
+
+    for(let i = 0; i < origins.length; i++){
+        let origin = origins[i];
+
+        console.log(req.headers.origin);
+
+        if(req.headers.origin.indexOf(origin) > -1){
+            res.header('Access-Control-Allow-Origin', req.headers.origin);
+        }
+    }
+
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
+
 app.get('/', (request, response) => {
     response.json({ info: 'Node.js, Express, and Postgres API' });
 });

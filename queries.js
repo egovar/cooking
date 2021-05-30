@@ -50,7 +50,7 @@ const createUser = (request, response) => {
                 .then((results) => {
                     const result_object = results.rows[0];
                     result_object.role = 'user';
-                    response.status(200).json([result_object]);
+                    response.status(200).json(result_object);
                 })
                 .catch((error) => console.log(error.stack));
             });
