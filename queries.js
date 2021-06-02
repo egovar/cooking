@@ -1,7 +1,7 @@
 const Pool = require('pg').Pool;
 const md5 = require('md5');
 const randomstring = require('randomstring');
-const server = 'http://127.0.0.1:3002';
+
 const pool = new Pool({
     user: 'ayyxvxcawvxmbm',
     host: 'ec2-34-240-75-196.eu-west-1.compute.amazonaws.com',
@@ -175,7 +175,7 @@ const editPassword = (request, response) => {
 
 const createRecipe = (request, response) => {
     const { title, text, time_minutes, ingredients_array } = request.body;
-    const link = `${ server }/photos/${request.file.filename}`
+    const link = `/photos/${request.file.filename}`
     const token = request.headers.token;
 
     pool

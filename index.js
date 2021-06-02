@@ -54,8 +54,8 @@ app.get('/api/recipe/:id', db.getRecipe);
 app.post('/api/user/create', db.createUser);
 app.get('/api/user/get_all' );
 // app.delete('/api/user/delete/:id', db.deleteUser);
-app.put('api/user/edit_login', db.editLogin);
-app.put('api/user/edit_password', db.editPassword);
+app.put('/api/user/edit_login', db.editLogin);
+app.put('/api/user/edit_password', db.editPassword);
 // app.get('api/user/:id', db.getUserInfo);
 //Все действия с рецептами
 app.post('/api/recipe/create', upload.single('picture'), db.createRecipe);
