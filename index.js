@@ -69,8 +69,8 @@ app.post('/api/comment/create', db.createComment);
 // app.post('/api/admin/grant', db.grantAdmin);
 // app.delete('/api/admin/withdraw/:id', db.withdrawAdmin);
 app.get('/photos/:name', (req, res) => {
-    res.sendFile(`/photos/${ req.params.name }`)
+    res.sendFile(`./photos/${ req.params.name }`)
 });
 app.get('/*', (req, res) => {
-    res.sendFile(`/build/index.html`);
+    res.sendFile(`./build/index.html`);
 });
