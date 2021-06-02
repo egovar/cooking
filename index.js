@@ -72,5 +72,5 @@ app.get('/photos/:name', (req, res) => {
     res.sendFile(__dirname + `/photos/${ req.params.name }`)
 });
 app.get('/*', (req, res) => {
-    res.sendFile(__dirname + `./build/index.html`);
+    res.sendFile(__dirname + `/build/index.html`);
 });
