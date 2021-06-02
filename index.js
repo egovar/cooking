@@ -71,6 +71,12 @@ app.post('/api/comment/create', db.createComment);
 app.get('/photos/:name', (req, res) => {
     res.sendFile(__dirname + `/photos/${ req.params.name }`)
 });
+app.get('/static/:folder/:file', (req, res) => {
+    res.sendFile(__dirname + `/build/static/` + req.params.folder + '/'+ req.params.file);
+});
+app.get('/static/:file', (req, res) => {
+    res.sendFile(__dirname + `/build/static/` + req.params.file);
+});
 app.get('/*', (req, res) => {
     res.sendFile(__dirname + `/build/index.html`);
 });
