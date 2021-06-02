@@ -168,7 +168,7 @@ const editPassword = (request, response) => {
     pool
         .query(`SELECT edit_password('${ token }', '${ old_password_hash }', '${ new_password_hash }')`)
         .then((results) => {
-            response.status(200).json(results.rows);
+            response.status(200).json(results.rows[0]);
         })
         .catch((error) => console.log(error.stack));
 }
