@@ -155,7 +155,7 @@ const editLogin = (request, response) => {
     pool
         .query(`SELECT edit_login('${ token }', '${ new_login }')`)
         .then((results) => {
-            response.status(200).json(results.rows);
+            response.status(200).json(results.rows[0]);
         })
         .catch((error) => console.log(error.stack));
 }
