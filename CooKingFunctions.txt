@@ -1,0 +1,215 @@
+CREATE OR REPLACE FUNCTION dispatch_likes() RETURNS TRIGGER AS $dispatch_likes$
+    BEGIN
+        IF (TG_OP = 'DELETE') THEN
+            UPDATE recipe SET likes = likes - 1 WHERE id = OLD.recipe_id;
+        ELSIF (TG_OP = 'INSERT') THEN
+             UPDATE recipe SET likes = likes + 1 WHERE NEW.recipe_id = id;
+        END IF;
+        RETURN NULL;
+    END;
+$dispatch_likes$ LANGUAGE plpgsql;
+
+CREATE TRIGGER like_trigger
+AFTER INSERT OR DELETE ON recipe_likes
+    FOR EACH ROW EXECUTE PROCEDURE dispatch_likes();
+
+
+CREATE FUNCTION is_login_available(new_login VARCHAR) RETURNS BOOLEAN AS $$
+	BEGIN
+		IF (SELECT id FROM "user" WHERE "login" = new_login) IS NULL THEN RETURN true;
+		ELSE RETURN false;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION is_token_available(new_token VARCHAR) RETURNS BOOLEAN AS $$
+	BEGIN
+		IF (SELECT user_id FROM token WHERE token = new_token) IS NULL THEN RETURN true;
+		ELSE RETURN false;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION create_user(login_var VARCHAR, password_hash VARCHAR, token_var VARCHAR) RETURNS
+	TABLE(
+		id INT,
+		login VARCHAR,
+		token VARCHAR
+	)
+AS $$
+	DECLARE
+		user_id_var INTEGER;
+	BEGIN
+		INSERT INTO "user" ("login", "password_hash")
+		VALUES(login_var, password_hash);
+		SELECT "user".id INTO user_id_var FROM "user" WHERE "user"."login" = login_var;
+		INSERT INTO token ("user_id", "token")
+		VALUES(user_id_var, token_var);
+		RETURN QUERY
+			SELECT "user".id, "user".login, "token".token FROM "user" JOIN token ON "user".id = user_id WHERE "token".token = token_var;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE or replace FUNCTION sign_in(login_var VARCHAR, password_hash_var VARCHAR, token_var VARCHAR) RETURNS
+	TABLE(
+		id INT,
+		login VARCHAR,
+		token VARCHAR
+	)
+AS $$
+	DECLARE 
+		user_id_var INTEGER;
+	BEGIN
+	    SELECT "user".id INTO user_id_var FROM "user" WHERE "user".login = login_var AND "password_hash" = password_hash_var;
+		IF user_id_var IS NULL
+			THEN RETURN QUERY SELECT -1, '505'::varchar, '505'::varchar;
+		ELSE
+			INSERT INTO token ("user_id", "token")
+			VALUES(user_id_var, token_var);
+			RETURN QUERY
+				SELECT "user".id, "user".login, token.token FROM "user" JOIN token ON "user".id = user_id WHERE "token".token = token_var;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION sign_out(token_var VARCHAR)RETURNS void AS $$
+	BEGIN
+		DELETE FROM token WHERE token = token_var;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION is_user(check_user_token VARCHAR) RETURNS BOOLEAN AS $$
+	BEGIN
+		IF (SELECT user_id FROM TOKEN WHERE "token" = check_user_token) IS NULL THEN RETURN false;
+		ELSE RETURN true;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION create_recipe(token_var VARCHAR,
+							  recipe_title VARCHAR,
+							  recipe_text TEXT,
+							  recipe_time_minutes INT,
+							  recipe_photo_link VARCHAR) RETURNS INT AS $$
+	DECLARE
+		recipe_id INT;
+		recipe_author_id INT;
+	BEGIN
+		IF is_user(token_var) = true THEN
+			SELECT user_id INTO recipe_author_id FROM token WHERE token = token_var;
+			INSERT INTO recipe ("author_id", "title", "description", "time_minutes", "photo_link")
+			VALUES(recipe_author_id, recipe_title, recipe_text, recipe_time_minutes, recipe_photo_link);
+			SELECT id INTO recipe_id FROM "recipe" WHERE "author_id" = recipe_author_id ORDER BY post_datetime DESC LIMIT 1;
+			RETURN recipe_id;
+		ELSE RETURN -1;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE or replace FUNCTION create_comment(token_var VARCHAR,
+							  comment_text TEXT,
+							  recipe_id INT) RETURNS INT AS $$
+	DECLARE 
+		comment_id INT;
+		comment_author_id INT;
+	BEGIN
+		IF is_user(token_var) = true THEN
+			SELECT user_id INTO comment_author_id FROM token WHERE token = token_var;
+			INSERT INTO comment ("author_id", "recipe_id", "text")
+			VALUES(comment_author_id, recipe_id, comment_text);
+			SELECT id INTO comment_id FROM comment WHERE "author_id" = comment_author_id ORDER BY post_datetime DESC LIMIT 1;
+			RETURN comment_id;
+		ELSE RETURN -1;
+		END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION did_like(like_user_token VARCHAR,
+						like_item_id INT,
+						is_recipe BOOLEAN) RETURNS BOOLEAN AS $$
+	DECLARE like_user_id INT;
+	BEGIN
+			SELECT user_id INTO like_user_id FROM token WHERE token = like_user_token;
+			IF (is_recipe = true) THEN
+				IF (SELECT user_id FROM recipe_likes WHERE user_id = like_user_id AND recipe_id = like_item_id) IS NULL THEN
+					RETURN false;
+				ELSE RETURN true;
+				END IF;
+			ELSE 
+				IF (SELECT user_id FROM comment_likes WHERE user_id = like_user_id AND comment_id = like_item_id) IS NULL THEN
+					RETURN false;
+				ELSE RETURN true;
+				END IF;
+			END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE FUNCTION like(like_user_token VARCHAR,
+					 like_item_id INT,
+					 is_recipe BOOLEAN) RETURNS VOID AS $$
+	DECLARE like_user_id INT;
+	BEGIN
+			IF (is_user(like_user_token) = true) THEN
+			SELECT user_id INTO like_user_id FROM token WHERE token = like_user_token;
+				IF (did_like(like_user_token, like_item_id, is_recipe) = true) THEN
+					IF is_recipe = true THEN
+						DELETE FROM recipe_likes WHERE user_id = like_user_id AND recipe_id = like_item_id;
+					ELSE
+						DELETE FROM comment_likes WHERE user_id = like_user_id AND recipe_id = like_item_id;
+					END IF;
+				ELSE 
+					IF is_recipe = true THEN
+						INSERT INTO recipe_likes(user_id, recipe_id)
+						VALUES(like_user_id, like_item_id);
+					ELSE
+						INSERT INTO comment_likes(user_id, recipe_id)
+						VALUES(like_user_id, like_item_id);
+					END IF;
+				END IF;
+			END IF;
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION edit_login(user_token VARCHAR, new_login VARCHAR) RETURNS VARCHAR AS $$
+	DECLARE user_id_var INT;
+	BEGIN
+		IF (SELECT is_user(user_token) = true) THEN
+			SELECT user_id INTO user_id_var FROM token WHERE token = user_token;
+			UPDATE "user" SET login = new_login WHERE id = user_id_var;
+			RETURN new_login;
+		ELSE RETURN 'token error';
+		END IF;
+	END;
+$$ LANGUAGE PlpgSQL;
+
+CREATE FUNCTION is_password_correct(user_token VARCHAR, old_password_hash VARCHAR) RETURNS BOOLEAN AS $$
+	DECLARE user_id_var INT;
+	BEGIN
+		IF (SELECT is_user(user_token) = true) THEN
+			SELECT user_id INTO user_id_var FROM token WHERE token = user_token;
+			IF (SELECT password_hash FROM "user" WHERE password_hash = old_password_hash AND id = user_id_var) IS NULL THEN RETURN false;
+			ELSE RETURN true;
+			END IF;
+		ELSE RETURN false;
+		END IF;
+	END;
+$$ LANGUAGE PlpgSQL;
+
+CREATE FUNCTION edit_password(user_token VARCHAR, old_password_hash VARCHAR, new_password_hash VARCHAR) RETURNS BOOLEAN AS $$
+	DECLARE user_id_var INT;
+	BEGIN
+		IF (SELECT is_password_correct(user_token, old_password_hash) = true) THEN 
+			SELECT user_id INTO user_id_var FROM token WHERE token = user_token;
+			UPDATE "user" SET password_hash = new_password_hash WHERE id = user_id_var;
+			RETURN true;
+		ELSE RETURN false;
+		END IF;
+	END;
+$$ LANGUAGE PlpgSQL;
+
+CREATE FUNCTION add_ingredient(ingredient_recipe_id INT, ingredient_name VARCHAR, ingredient_quantity INT, ingredient_unit_name VARCHAR) RETURNS void AS $$
+	BEGIN
+		INSERT INTO ingredients(recipe_id, name, amount, unit_name)
+		VALUES(ingredient_recipe_id, ingredient_name, ingredient_quantity, ingredient_unit_name);
+	END;
+$$ LANGUAGE PlpgSQL;
